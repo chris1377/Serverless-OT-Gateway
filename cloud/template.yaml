@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless OT-Gateway Ingestion Stack con DynamoDB.
+
+Resources:
+  # 1. Creazione del Database Serverless (DynamoDB)
+  TelemetryTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: timestamp
+        Type: String
+
+  # 2. Aggiornamento Lambda
+  TelemetryReceiverFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TelemetryTable
+      Policies:
+        # Diamo alla Lambda il permesso di scrivere nel DB appena creato
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TelemetryTable
+      Events:
+        TelemetryPost:
+          Type: HttpApi
+          Properties:
+            Path: /telemetry
+            Method: post
+
+Outputs:
+  GatewayEndpoint:
+    Description: "Endpoint API Gateway"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/telemetry"
